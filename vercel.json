@@ -1,4 +1,5 @@
 {
+  "installCommand": "pip install -r requirements.txt --break-system-packages",
   "env": {
     "SUPABASE_URL": "",
     "SUPABASE_KEY": "",
