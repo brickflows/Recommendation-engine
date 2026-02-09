@@ -1,5 +1,4 @@
 {
-  "buildCommand": "pip install -r requirements-vercel.txt",
   "env": {
     "SUPABASE_URL": "",
     "SUPABASE_KEY": "",
