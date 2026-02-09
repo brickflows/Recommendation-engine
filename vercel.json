@@ -1,8 +1,27 @@
 {
-  "installCommand": "pip install -r requirements.txt --break-system-packages",
-  "env": {
-    "SUPABASE_URL": "",
-    "SUPABASE_KEY": "",
-    "OPENAI_API_KEY": ""
-  }
+  "builds": [
+    {
+      "src": "api/*.py",
+      "use": "@vercel/python",
+      "config": {
+        "pipArgs": [
+          "--break-system-packages"
+        ]
+      }
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
 }
