@@ -11,12 +11,20 @@ from typing import Dict, List, Any, Tuple
 import os
 from supabase import create_client, Client
 
-# Initialize clients
+# Initialize clients lazily to avoid crashing on import if env vars are missing
 supabase_url = os.environ.get('SUPABASE_URL')
 supabase_key = os.environ.get('SUPABASE_KEY')
-supabase: Client = create_client(supabase_url, supabase_key)
-
 openai.api_key = os.environ.get('OPENAI_API_KEY')
+
+_supabase_client = None
+
+def get_supabase() -> Client:
+    global _supabase_client
+    if _supabase_client is None:
+        if not supabase_url or not supabase_key:
+            raise ValueError('SUPABASE_URL and SUPABASE_KEY environment variables are required')
+        _supabase_client = create_client(supabase_url, supabase_key)
+    return _supabase_client
 
 # Scoring weights
 WEIGHTS = {
@@ -401,7 +409,7 @@ class handler(BaseHTTPRequestHandler):
     def _set_cors_headers(self):
         """Set CORS headers for cross-origin requests"""
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.send_header('Access-Control-Max-Age', '3600')
     
@@ -410,6 +418,30 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(204)
         self._set_cors_headers()
         self.end_headers()
+    
+    def do_GET(self):
+        """Handle GET requests - returns API status and usage info"""
+        self.send_response(200)
+        self._set_cors_headers()
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        env_ok = bool(supabase_url and supabase_key and openai.api_key)
+        response = {
+            'status': 'running',
+            'endpoint': '/api/recommend',
+            'method': 'POST',
+            'env_configured': env_ok,
+            'usage': {
+                'method': 'POST',
+                'body': {
+                    'user_id': '(required) UUID of user with quiz responses',
+                    'limit': '(optional) max recommendations, default 10',
+                    'min_score': '(optional) minimum match score 0-1, default 0.3',
+                    'use_ai': '(optional) use AI skill matching, default true'
+                }
+            }
+        }
+        self.wfile.write(json.dumps(response).encode())
     
     def do_POST(self):
         """Handle POST requests"""
@@ -433,7 +465,8 @@ class handler(BaseHTTPRequestHandler):
             use_ai = request_data.get('use_ai', True)
             
             # Get user quiz data from Supabase
-            user_response = supabase.table('users').select('quiz_responses').eq('id', user_id).execute()
+            sb = get_supabase()
+            user_response = sb.table('users').select('quiz_responses').eq('id', user_id).execute()
             
             if not user_response.data or len(user_response.data) == 0:
                 self.send_response(404)
@@ -446,7 +479,7 @@ class handler(BaseHTTPRequestHandler):
             user_data = user_response.data[0].get('quiz_responses', {})
             
             # Get all published businesses from Supabase
-            businesses_response = supabase.table('blueprints').select('*').eq('published', True).execute()
+            businesses_response = sb.table('blueprints').select('*').eq('published', True).execute()
             
             if not businesses_response.data:
                 self.send_response(404)
@@ -478,7 +511,7 @@ class handler(BaseHTTPRequestHandler):
             }
             
             try:
-                supabase.table('recommendations_cache').upsert(cache_data, on_conflict='user_id').execute()
+                sb.table('recommendations_cache').upsert(cache_data, on_conflict='user_id').execute()
             except Exception as cache_error:
                 print(f"Cache error (non-critical): {cache_error}")
             
