@@ -2,12 +2,7 @@
   "builds": [
     {
       "src": "api/*.py",
-      "use": "@vercel/python",
-      "config": {
-        "pipArgs": [
-          "--break-system-packages"
-        ]
-      }
+      "use": "@vercel/python"
     },
     {
       "src": "index.html",
