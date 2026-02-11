@@ -1,4 +1,15 @@
 {
+    "builds": [
+        {
+            "src": "api/index.py",
+            "use": "@vercel/python",
+            "config": {
+                "pipArgs": [
+                    "--break-system-packages"
+                ]
+            }
+        }
+    ],
     "rewrites": [
         {
             "source": "/api/(.*)",
